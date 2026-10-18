@@ -1,0 +1,13 @@
+{
+  "dry_run": true,
+  "force_entry_enable": false,
+  "strategy_path": "/opt/starter/strategies",
+  "telegram": {"enabled": false, "token": "", "chat_id": ""},
+  "exchange": {"key": "", "secret": ""},
+  "api_server": {
+    "enabled": true,
+    "listen_ip_address": "0.0.0.0",
+    "listen_port": 8080,
+    "enable_openapi": false
+  }
+}

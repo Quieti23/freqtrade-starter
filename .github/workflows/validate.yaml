@@ -1,0 +1,53 @@
+name: Validate starter
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      online:
+        description: Run real public-data download and backtest (requires Binance access)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose and shell
+        run: |
+          docker compose --profile '*' config --quiet
+          sh -n start.sh
+      - name: Test initialization, safety and strategy behavior
+        run: |
+          docker compose run --rm --no-deps -v "$PWD:/opt/project:ro" \
+            --entrypoint python tools -m unittest discover -s /opt/project/tests -v
+      - name: Verify non-default Linux UID can use upstream dependencies
+        run: |
+          docker compose run --rm --no-deps --user 1001:1001 \
+            --entrypoint python tools -c "import numpy, pandas, talib; print('Linux UID dependency check passed')"
+      - name: Validate official Freqtrade config and strategy loading
+        run: |
+          sh start.sh init
+          sh start.sh check
+      - name: Build optional gateway
+        run: docker compose --profile gateway build market_gateway
+
+  online:
+    if: github.event_name == 'workflow_dispatch' && inputs.online
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: First-run journey
+        run: sh start.sh start --mode both --days 7
+      - name: Verify authentication and persisted results
+        env:
+          STARTER_RUNTIME_TESTS: "1"
+        run: python3 -m unittest discover -s tests -p test_runtime.py -v
+      - name: Stop without deleting user data
+        if: always()
+        run: sh start.sh stop

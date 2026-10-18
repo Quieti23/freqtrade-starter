@@ -1,0 +1,110 @@
+name: freqtrade-starter
+
+x-freqtrade: &freqtrade
+  image: freqtrade-starter/freqtrade:2026.1-1
+  build:
+    context: ./docker/freqtrade
+  pull_policy: never
+  user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+  environment:
+    HOME: /tmp
+    PYTHONUSERBASE: /home/ftuser/.local
+  volumes:
+    - ./runtime:/freqtrade/user_data
+    - ./strategies:/opt/starter/strategies:ro
+    - ./templates:/opt/starter/templates:ro
+    - ./scripts:/opt/starter/scripts:ro
+
+services:
+  backtest:
+    <<: *freqtrade
+    profiles: [research]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${BACKTEST_PORT:-18085}:8080"
+    command:
+      - webserver
+      - --config
+      - /freqtrade/user_data/config.backtest.json
+      - --config
+      - /opt/starter/templates/safety.json
+      - --config
+      - /freqtrade/user_data/config.route.json
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/v1/ping', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 12
+      start_period: 30s
+
+  trader:
+    <<: *freqtrade
+    profiles: [paper]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PAPER_PORT:-18080}:8080"
+    command:
+      - trade
+      - --config
+      - /freqtrade/user_data/config.paper.json
+      - --config
+      - /opt/starter/templates/safety.json
+      - --config
+      - /freqtrade/user_data/config.route.json
+      - --strategy
+      - StarterStrategy
+      - --db-url
+      - sqlite:////freqtrade/user_data/trades.paper.sqlite
+      - --logfile
+      - /freqtrade/user_data/logs/paper.log
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/v1/ping', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 12
+      start_period: 60s
+
+  tools:
+    <<: *freqtrade
+    profiles: [tools]
+    entrypoint: ["python", "/opt/starter/scripts/bootstrap.py"]
+
+  cli:
+    <<: *freqtrade
+    profiles: [tools]
+    entrypoint: ["freqtrade"]
+
+  market_gateway:
+    profiles: [gateway]
+    build:
+      context: ./market_gateway
+    restart: unless-stopped
+    environment:
+      REDIS_URL: "${GATEWAY_REDIS_URL:-}"
+      GATEWAY_SYMBOLS: BTCUSDT
+      GATEWAY_INTERVALS: 5m
+      GATEWAY_PREWARM_LIMIT: "200"
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-19000}:9000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/upstream/health', timeout=20)"]
+      interval: 20s
+      timeout: 25s
+      retries: 6
+      start_period: 40s
+
+  market_redis:
+    image: redis:7.2-alpine@sha256:dfa18828cbc07b3ae6a95ec7343f6c214fdee2d836197b4be8e9904420762cd8
+    profiles: [redis]
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  redis_data:
