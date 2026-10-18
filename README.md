@@ -136,6 +136,7 @@ docker compose logs --tail 100 backtest trader market_gateway market_redis
 不依赖交易所的配置/策略测试（Linux Shell）：
 
 ```sh
+mkdir -p runtime
 docker compose run --rm --no-deps -v "$PWD:/opt/project:ro" \
   --entrypoint python tools -m unittest discover -s /opt/project/tests -v
 ```
@@ -143,6 +144,7 @@ docker compose run --rm --no-deps -v "$PWD:/opt/project:ro" \
 Windows PowerShell：
 
 ```powershell
+New-Item -ItemType Directory runtime -Force | Out-Null
 docker compose run --rm --no-deps -v "${PWD}:/opt/project:ro" --entrypoint python tools -m unittest discover -s /opt/project/tests -v
 ```
 

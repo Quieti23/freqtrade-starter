@@ -20,6 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate Compose and shell
         run: |
+          mkdir -p runtime
           docker compose --profile '*' config --quiet
           sh -n start.sh
       - name: Test initialization, safety and strategy behavior

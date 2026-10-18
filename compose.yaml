@@ -10,7 +10,11 @@ x-freqtrade: &freqtrade
     HOME: /tmp
     PYTHONUSERBASE: /home/ftuser/.local
   volumes:
-    - ./runtime:/freqtrade/user_data
+    - type: bind
+      source: ./runtime
+      target: /freqtrade/user_data
+      bind:
+        create_host_path: false
     - ./strategies:/opt/starter/strategies:ro
     - ./templates:/opt/starter/templates:ro
     - ./scripts:/opt/starter/scripts:ro
